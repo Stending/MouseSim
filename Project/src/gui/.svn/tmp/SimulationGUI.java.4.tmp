@@ -1,0 +1,638 @@
+package gui;
+
+import javax.swing.*;
+import javax.swing.border.Border;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
+
+import mouse.Mouse;
+
+import utilities.Point;
+
+import engine.Simulation;
+import griddata.GridParameters;
+import griddata.ObstacleSquare;
+import griddata.PraticableSquare;
+import griddata.Square;
+
+import java.awt.*;
+import java.awt.event.*;
+import java.io.IOException;
+import java.util.ArrayList;
+
+public class SimulationGUI extends JFrame implements Runnable, MouseListener {
+
+	private static final long serialVersionUID = 1L;
+
+	private int simulationSpeed = 500;
+
+	private Simulation simulation;
+
+	private boolean stop = true;
+
+	private SimulationGUI instance = this;
+
+	private static final Font LABEL_FONT = new Font(Font.MONOSPACED, Font.BOLD,
+			20);
+	private static final Font FIELD_FONT = new Font(Font.MONOSPACED, Font.BOLD,
+			25);
+
+	private JScrollPane gridScrollPane;
+
+	protected JPanel gridParamsPanel = new JPanel();
+	protected JPanel sizeParamsPanel = new JPanel();
+	protected JPanel foodParamsPanel = new JPanel();
+	protected JPanel obstaclesParamsPanel = new JPanel();
+	protected JPanel miceParamsPanel = new JPanel();
+	protected JPanel controlPanel = new JPanel();
+
+	protected InfosPanel infosPanel = new InfosPanel();
+	
+	protected Log logPanel = new Log();
+	
+	protected Chat chatPanel;
+
+	protected JLabel sizeXLabel = new JLabel("X : ");
+	protected JLabel sizeYLabel = new JLabel("Y : ");
+	protected JLabel foodDensityLabel = new JLabel("Food % : ");
+	protected JLabel obstaclesDensityLabel = new JLabel("Obstacles % : ");
+	protected JLabel numMiceLabel = new JLabel("Mice nb : ");
+	protected JLabel speedLabel = new JLabel("");
+	protected JLabel infosLabel = new JLabel("");
+	protected JLabel zoomLabel = new JLabel("Zoom : ");
+
+	protected JTextField sizeXField = new JTextField(30);
+	protected JTextField sizeYField = new JTextField(30);
+	protected JTextField foodDensityField = new JTextField(30);
+	protected JTextField obstaclesDensityField = new JTextField(30);
+	protected JTextField numMiceField = new JTextField(30);
+
+	protected JButton generateButton = new JButton("Generate Grid");
+	protected JButton startButton = new JButton("Play");
+	protected JButton nextTurnButton = new JButton("Next Turn");
+	protected JButton speedUpButton = new JButton("►►");
+	protected JButton speedDownButton = new JButton("◄◄");
+	// protected JButton zoomUpButton = new JButton("+");
+	// protected JButton zoomDownButton = new JButton("-");
+	
+	protected JSlider zoomSlide = new JSlider(JSlider.HORIZONTAL, 10, 100, 50);
+
+	protected GridGUI gridGUI = new GridGUI();
+
+	public SimulationGUI(String title) {
+		super(title);
+		this.addMouseListener(this);
+		simulation = new Simulation();
+		simulation.generateGrid(new GridParameters(10, 10, 5, 15, 5, 5));
+		simulation.getGrid().displayConsole();
+		chatPanel = new Chat(simulation.getGrid());
+		gridGUI.setGrid(simulation.getGrid());
+		gridGUI.addMouseListener(this);
+		// infosPanel.setGrid(simulation.getGrid());
+		initActions();
+		initStyle();
+		init();
+
+	}
+
+	protected void initActions() {
+		generateButton.addActionListener(new GenerateGrid());
+		startButton.addActionListener(new StartStopAction());
+		nextTurnButton.addActionListener(new SimulateTurnAction());
+		speedUpButton.addActionListener(new SpeedAction(">>"));
+		speedDownButton.addActionListener(new SpeedAction("<<"));
+		zoomSlide.addChangeListener(new ZoomAction());
+		// zoomUpButton.addActionListener(new ZoomAction("+"));
+		// zoomDownButton.addActionListener(new ZoomAction("-"));
+	}
+
+	protected void initStyle() {
+		sizeXLabel.setFont(LABEL_FONT);
+		sizeYLabel.setFont(LABEL_FONT);
+		sizeXField.setFont(FIELD_FONT);
+		sizeYField.setFont(FIELD_FONT);
+		foodDensityField.setFont(FIELD_FONT);
+		obstaclesDensityField.setFont(FIELD_FONT);
+		numMiceField.setFont(FIELD_FONT);
+		speedLabel.setFont(LABEL_FONT);
+		speedLabel.setText("x" + (float)simulationSpeed/500);
+		speedLabel.setHorizontalAlignment(JLabel.CENTER);
+		speedLabel.setVerticalAlignment(JLabel.CENTER);
+	}
+
+	private void init() {
+
+		Container contentPane = getContentPane();
+		contentPane.setLayout(new GridBagLayout());
+
+		GridBagConstraints frameConstraints = new GridBagConstraints();
+
+		gridGUI.setPreferredSize(new Dimension(simulation.getGrid()
+				.getGridParams().getSizex()
+				* gridGUI.getSquareSize(), simulation.getGrid().getGridParams()
+				.getSizey()
+				* gridGUI.getSquareSize()));
+
+		gridScrollPane = new JScrollPane(gridGUI,
+				ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
+				ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+<<<<<<< .mine
+		gridScrollPane.setPreferredSize(new  Dimension(400,  400)); 
+=======
+		gridScrollPane.setPreferredSize(new Dimension((simulation.getGrid()
+				.getGridParams().getSizex() * (gridGUI.getSquareSize() + 1)),
+				(simulation.getGrid().getGridParams().getSizey() * (gridGUI
+						.getSquareSize() + 1))));
+>>>>>>> .r14
+
+		frameConstraints.gridx = 0;
+		frameConstraints.gridy = 0;
+		contentPane.add(gridScrollPane, frameConstraints);
+
+		gridParamsPanel.setPreferredSize(new Dimension(200, 400));
+		frameConstraints.gridx = 1;
+		frameConstraints.gridy = 0;
+		contentPane.add(gridParamsPanel, frameConstraints);
+		gridParamsPanel.setLayout(new GridLayout(5, 1));
+		sizeParamsPanel.setLayout(new GridLayout(1, 4));
+		sizeXField.setText("10");
+		sizeYField.setText("10");
+		sizeParamsPanel.add(sizeXLabel);
+		sizeParamsPanel.add(sizeXField);
+		sizeParamsPanel.add(sizeYLabel);
+		sizeParamsPanel.add(sizeYField);
+		gridParamsPanel.add(sizeParamsPanel);
+
+		foodParamsPanel.setLayout(new GridLayout(1, 2));
+		foodDensityField.setText("15");
+		foodParamsPanel.add(foodDensityLabel);
+		foodParamsPanel.add(foodDensityField);
+		gridParamsPanel.add(foodParamsPanel);
+
+		obstaclesParamsPanel.setLayout(new GridLayout(1, 2));
+		obstaclesDensityField.setText("5");
+		obstaclesParamsPanel.add(obstaclesDensityLabel);
+		obstaclesParamsPanel.add(obstaclesDensityField);
+		gridParamsPanel.add(obstaclesParamsPanel);
+
+		miceParamsPanel.setLayout(new GridLayout(1, 2));
+		numMiceField.setText("5");
+		miceParamsPanel.add(numMiceLabel);
+		miceParamsPanel.add(numMiceField);
+		gridParamsPanel.add(miceParamsPanel);
+		
+		gridParamsPanel.add(generateButton);
+
+		controlPanel.setPreferredSize(new Dimension(simulation.getGrid()
+				.getGridParams().getSizex()
+				* (gridGUI.getSquareSize() + 1), 100));
+		controlPanel.setLayout(new GridLayout(1, 2));
+		controlPanel.add(startButton);
+		
+		JPanel p1 = new JPanel(new GridLayout(2, 1));
+		JPanel p2 = new JPanel(new GridLayout(1, 3));
+		JPanel p3 = new JPanel(new GridLayout(1, 2));
+		JPanel p4 = new JPanel(new GridLayout(2, 1));
+		p2.add(speedDownButton);
+
+		p2.add(speedLabel);
+		p2.add(speedUpButton);
+		p4.add(zoomLabel);
+		p4.add(zoomSlide);
+
+		nextTurnButton.setPreferredSize(new Dimension(225, 100));
+		frameConstraints.gridx = 0;
+		frameConstraints.gridy = 0;
+		p3.add(nextTurnButton);
+		frameConstraints.gridx = 1;
+		frameConstraints.gridy = 0;
+		p3.add(p4);
+		p3.setPreferredSize(new Dimension(225, 100));
+		p1.add(p3);
+		p1.add(p2);
+		controlPanel.add(p1);
+		frameConstraints.gridx = 0;
+		frameConstraints.gridy = 1;
+		contentPane.add(controlPanel, frameConstraints);
+
+		infosPanel.setPreferredSize(new Dimension(600, 100));
+		frameConstraints.gridx = 1;
+		frameConstraints.gridy = 1;
+		contentPane.add(infosPanel, frameConstraints);
+		
+		logPanel.setPreferredSize(new Dimension (600,220));
+		frameConstraints.gridx = 1;
+		frameConstraints.gridy = 2;
+		contentPane.add(logPanel, frameConstraints);
+		
+		chatPanel.setPreferredSize(new Dimension(510, 220));
+		frameConstraints.gridx = 0;
+		frameConstraints.gridy = 2;
+		contentPane.add(chatPanel, frameConstraints);
+		
+		setDefaultCloseOperation(EXIT_ON_CLOSE);
+		pack();
+		setVisible(true);
+		setResizable(false);
+	}
+
+	public void updateGrid() {
+		gridGUI.updateUI();
+		gridGUI.repaint();
+	}
+
+	@Override
+	public void run() {
+		while (!stop) {
+
+			simulation.simulateNextTurn();
+			infosPanel.updateInfos();
+			logPanel.updateLog();
+			updateGrid();
+			System.out.println("\n---------------------------\n");
+			// System.out.println(simulation.getGrid().getMice().toString());
+			try {
+				Thread.sleep(simulationSpeed);
+			} catch (InterruptedException e) {
+				System.out.println(e.getMessage());
+			}
+		}
+	}
+
+	private class GenerateGrid implements ActionListener {
+
+		public void actionPerformed(ActionEvent e) {
+			simulation.generateGrid(new GridParameters(Integer
+					.parseInt(sizeXField.getText()), Integer
+					.parseInt(sizeYField.getText()), Integer
+					.parseInt(numMiceField.getText()), Integer
+					.parseInt(foodDensityField.getText()), Integer
+					.parseInt(obstaclesDensityField.getText()), 5));
+			gridGUI.setGrid(simulation.getGrid());
+			gridGUI.setPreferredSize(new Dimension(simulation.getGrid()
+					.getGridParams().getSizex()
+					* gridGUI.getSquareSize(), simulation.getGrid()
+					.getGridParams().getSizey()
+					* gridGUI.getSquareSize()));
+			updateGrid();
+			stop = true;
+			startButton.setText(" Play ");
+		}
+	}
+
+	private class StartStopAction implements ActionListener {
+		@Override
+		public void actionPerformed(ActionEvent e) {
+			if (!stop) {
+				stop = true;
+				startButton.setText(" Play ");
+			} else {
+				stop = false;
+				startButton.setText(" Pause ");
+				simulation.launchSimulation();
+				Thread simThread = new Thread(instance);
+				simThread.start();
+			}
+		}
+	}
+
+	private class SimulateTurnAction implements ActionListener {
+		@Override
+		public void actionPerformed(ActionEvent e) {
+			if (stop) {
+				simulation.simulateNextTurn();
+				infosPanel.updateInfos();
+				logPanel.updateLog();
+				updateGrid();
+				System.out.println("\n---------------------------\n");
+			}
+		}
+
+	}
+
+	private class SpeedAction implements ActionListener {
+
+		private boolean sens;
+
+		public SpeedAction(String s) {
+			super();
+			this.sens = (s.equals(">>"));
+		}
+
+		@Override
+		public void actionPerformed(ActionEvent e) {
+			if (sens) {
+				simulationSpeed /= 2;
+				if (simulationSpeed <= 125)
+					simulationSpeed = 125;
+			} else {
+				simulationSpeed *= 2;
+				if (simulationSpeed > 2000)
+					simulationSpeed = 2000;
+			}
+			speedLabel.setText("x" + (float)500/simulationSpeed);
+		}
+	}
+
+	private class ZoomAction implements ChangeListener {
+		public void stateChanged(ChangeEvent e) {
+			gridGUI.setSquareSize(((JSlider) e.getSource()).getValue());
+			gridGUI.setPreferredSize(new Dimension(simulation.getGrid()
+					.getGridParams().getSizex()
+					* gridGUI.getSquareSize(), simulation.getGrid()
+					.getGridParams().getSizey()
+					* gridGUI.getSquareSize()));
+			updateGrid();
+			gridGUI.repaint();
+		}
+	}
+
+	
+
+	/*
+	 * private class ZoomAction implements ActionListener {
+	 * 
+	 * private boolean sens;
+	 * 
+	 * public ZoomAction(String s) { super(); this.sens = (s.equals("+")); }
+	 * 
+	 * @Override public void actionPerformed(ActionEvent e) { if (sens) {
+	 * gridGUI.setSquareSize(gridGUI.getSquareSize() + 10); if
+	 * (gridGUI.getSquareSize() > 100) gridGUI.setSquareSize(100); } else {
+	 * gridGUI.setSquareSize(gridGUI.getSquareSize() - 10); if
+	 * (gridGUI.getSquareSize() < 10) gridGUI.setSquareSize(10); }
+	 * gridGUI.setPreferredSize(new Dimension(simulation.getGrid()
+	 * .getGridParams().getSizex() gridGUI.getSquareSize(), simulation.getGrid()
+	 * .getGridParams().getSizey() gridGUI.getSquareSize())); updateGrid();
+	 * gridGUI.repaint(); // speedLabel.setText("" + simulationSpeed); } }
+	 */
+
+	public static void main(String[] args) throws IOException {
+
+		new SimulationGUI("SIMULATION ZUT !!");
+	}
+
+	@Override
+	public void mouseClicked(MouseEvent e) {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void mouseReleased(MouseEvent e) {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void mouseEntered(MouseEvent e) {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void mouseExited(MouseEvent e) {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void mousePressed(MouseEvent e) {
+		// TODO Auto-generated method stub
+		Point p = new Point(e.getX() / gridGUI.getSquareSize(), e.getY()
+				/ gridGUI.getSquareSize());
+		// Point p2 = new Point(e.getXOnScreen() / gridGUI.getSquareSize(),
+		// e.getYOnScreen()/ gridGUI.getSquareSize());
+		if (e.getClickCount() == 1) /* && (p2.getX()<8) && (p2.getY()<8)) */{
+			if (simulation.getGrid().getSquare(p) != null) {
+				gridGUI.setSelectedSquare(p);
+<<<<<<< .mine
+				System.out.println("Vous avez cliqu� sur " + p.toString());
+=======
+				System.out.println("Vous avez cliqué sur " + p.toString());
+>>>>>>> .r14
+				infosPanel.updateInfos(p, simulation.getGrid().getSquare(p),
+						simulation.getGrid().getMiceAtPosition(p));
+				repaint();
+			}
+			// infosLabel.setText(simulation.getGrid().getMiceAtPosition(p).toString());
+		} else {
+			// infosLabel.setText("");
+			gridGUI.setSelectedSquare(null);
+		}
+	}
+
+	private class InfosPanel extends JPanel {
+
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
+		private Square square;
+		private Point squarePoint;
+		private ArrayList<Mouse> squareMice;
+		private Mouse mouse;
+		private String mode = "";
+
+		protected JPanel pan = new JPanel();
+
+		protected JButton obstacleButton = new JButton("Obstacle");
+		protected JButton emptyButton = new JButton("Empty");
+		protected JButton foodButton = new JButton("Food");
+		protected JButton mouseButton = new JButton("Go to mouse");
+		protected JLabel nameLabel = new JLabel("Square");
+		protected JTextField foodQttField = new JTextField("30");
+		protected JList miceList = new JList();
+		//protected JScrollPane jsMiceList = new JScrollPane(); 
+		protected GridBagLayout layout = new GridBagLayout();
+		protected GridBagConstraints cons = new GridBagConstraints();
+		protected JTextArea mouseInfos = new JTextArea("");
+		protected JCheckBox displayModeCheckBox = new JCheckBox("");
+
+		public InfosPanel() {
+			super();
+			initActions();
+			this.setLayout(layout);
+			this.add(pan);
+		}
+
+		public void initActions() {
+			obstacleButton.addActionListener(new BecomeObstacleAction());
+			emptyButton.addActionListener(new BecomeEmptyAction());
+			foodButton.addActionListener(new ChangeFoodAction());
+			mouseButton.addActionListener(new SelectMouseAction());
+			foodQttField.setPreferredSize(new Dimension(30, 27));
+			miceList.setPreferredSize(new Dimension(40,40));
+			//jsMiceList = new JScrollPane(miceList,ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+			//jsMiceList.setPreferredSize(new Dimension (60,60));
+			miceList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+			cons.fill = GridBagConstraints.BOTH;
+			cons.weightx = 1;
+			cons.weighty = 1;
+
+			displayModeCheckBox.addItemListener(new ItemListener() {
+				@Override
+				public void itemStateChanged(ItemEvent e) {
+					if (e.getStateChange() == ItemEvent.SELECTED) {
+						gridGUI.setDisplayMode("Memory");
+						gridGUI.repaint();
+						System.out.println("LOLOLO");
+					} 
+					else {
+						gridGUI.setDisplayMode("Global");
+						gridGUI.repaint();
+						System.out.println("LELELE");
+					}
+				}
+			});
+		}
+		
+		public void updateInfos(Point p, Square s, ArrayList<Mouse> sm) {
+<<<<<<< .mine
+			// System.out.println("Case " + p.toString() + " s�lectionn�e");
+=======
+>>>>>>> .r14
+			System.out.println(p.toString());
+			if (!p.equals(squarePoint)) {
+				this.squarePoint = p;
+				this.square = s;
+				this.squareMice = sm;
+				this.mouse = null;
+				this.mode = "Square";
+				updateInfos();
+			}
+		}
+
+		public void updateInfos(Mouse m) {
+			this.square = null;
+			this.squareMice = null;
+			this.mouse = m;
+			this.mode = "Mouse";
+			updateInfos();
+		}
+
+		public void updateInfos() {
+			if (mode.equals("Mouse")
+					&& !simulation.getGrid().getMice().contains(mouse)) {
+				updateInfos(mouse.getPosition(), simulation.getGrid()
+						.getSquare(mouse.getPosition()), simulation.getGrid()
+						.getMiceAtPosition(mouse.getPosition()));
+				return;
+			}
+			Border blackline = BorderFactory.createLineBorder(Color.black);
+			pan = new JPanel();
+			this.setBorder(blackline);
+
+			this.remove(pan);
+			if (mode.equals("Square")) {
+				pan.setLayout(layout);
+				cons.gridwidth = 1;
+				cons.gridy = 0;
+				if (!square.isPraticable()) {
+					nameLabel.setText("Obstacle " + squarePoint.toString());
+				} else if (square.containsFood()) {
+					nameLabel.setText("Food Source " + squarePoint.toString());
+				} else {
+					nameLabel.setText("Empty Square" + squarePoint.toString());
+				}
+				cons.gridx = 0;
+				layout.setConstraints(nameLabel, cons);
+				pan.add(nameLabel);
+				if (!square.isPraticable()) {
+					cons.gridx = 1;
+					layout.setConstraints(emptyButton, cons);
+					pan.add(emptyButton);
+				} else {
+					cons.gridx = 1;
+					layout.setConstraints(obstacleButton, cons);
+					pan.add(obstacleButton);
+					foodQttField.setText("" + square.getFoodQuantity());
+					cons.gridx = 2;
+					layout.setConstraints(foodQttField, cons);
+					pan.add(foodQttField);
+					cons.gridx = 3;
+					layout.setConstraints(foodButton, cons);
+					pan.add(foodButton);
+				}
+				if (!squareMice.isEmpty()) {
+					cons.gridy = 1;
+					miceList = new JList(squareMice.toArray());
+					cons.gridx = 1;
+					layout.setConstraints(mouseButton, cons);
+					pan.add(mouseButton);
+					cons.gridx = 0;
+					layout.setConstraints(miceList, cons);
+					pan.add(miceList);
+					mouseInfos.setText("");
+					pan.add(mouseInfos);
+				}
+
+			} else if (mode.equals("Mouse")) {
+				cons.gridx = 0;
+				cons.gridy = 0;
+				layout.setConstraints(mouseInfos, cons);
+				cons.gridy = 1;
+				//layout.setConstraints(tchatteTextArea, cons);
+				pan.setLayout(layout);
+				mouseInfos.setText(mouse.getName() + "\n" + mouse.getGender()
+						+ "\n" + mouse.getLifeTime() + " life points\n"
+						+ mouse.isSterile() + mouse.getPregnancyTime());
+				pan.add(mouseInfos);
+				pan.add(displayModeCheckBox);
+				gridGUI.setSelectedSquare(mouse.getPosition());
+				if (mouse.getLifeTime() == 0)
+					mouseInfos.setText(mouse.getName() + " est morte^^");
+			}
+			this.removeAll();
+			this.add(pan);
+			this.repaint();
+		}
+
+		private class SelectMouseAction implements ActionListener {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				if (!miceList.isSelectionEmpty()) {
+					mouse = (Mouse) miceList.getSelectedValue();
+					mode = "Mouse";
+					infosPanel.updateInfos();
+					gridGUI.selectMouse(mouse);
+				} else
+					JOptionPane.showMessageDialog(infosPanel,
+							"No mouse is selected in the list !", "Error",
+							JOptionPane.ERROR_MESSAGE);
+			}
+		}
+
+		private class BecomeObstacleAction implements ActionListener {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				Square ns = new ObstacleSquare();
+				simulation.getGrid().setSquare(squarePoint, ns);
+				square = ns;
+				gridGUI.repaint();
+				updateInfos();
+			}
+		}
+
+		private class BecomeEmptyAction implements ActionListener {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				Square ns = new PraticableSquare();
+				simulation.getGrid().setSquare(squarePoint, ns);
+				square = ns;
+				gridGUI.repaint();
+				updateInfos();
+			}
+		}
+
+		private class ChangeFoodAction implements ActionListener {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				square.getFoodSource().setQuantity(
+						Integer.parseInt(foodQttField.getText()));
+				gridGUI.repaint();
+			}
+		}			
+	}
+		
+}

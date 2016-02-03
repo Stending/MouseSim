@@ -1,0 +1,355 @@
+package engine;
+
+import utilities.Direction;
+import utilities.PathFinding;
+import utilities.Point;
+import utilities.Random;
+import mouse.Mouse;
+import griddata.Food;
+import griddata.Grid;
+import griddata.GridParameters;
+import griddata.Square;
+import gui.Log;
+
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+
+/**
+ * This class manages the whole simulation
+ * 
+ * @author Matthieu
+ * 
+ */
+
+public class Simulation {
+
+	private Grid grid;
+	private int foodRegenCounter = 10;
+	// private boolean running;
+	private ArrayList<Mouse> miceToKill = new ArrayList<Mouse>();
+	private ArrayList<Mouse> miceToAdd = new ArrayList<Mouse>();
+
+	private PathFinding pathFinding = new PathFinding(); 
+	
+	
+	public static ArrayList<String> boyNames = new ArrayList<String>();
+	public static ArrayList<String> girlNames = new ArrayList<String>();
+	public static int otherNamesCounter = 0;
+
+	public Simulation() {
+		fillNamesLists();
+		
+	}
+
+	/**
+	 * This method will generate a grid depending on different parameters
+	 * 
+	 * @param params
+	 *            contain every parameters needed to generate the grid
+	 * 
+	 */
+	public void generateGrid(GridParameters params) {
+		fillNamesLists();
+		Generation gen = new Generation(params);
+		pathFinding.setSizeX(params.getSizex());
+		pathFinding.setSizeY(params.getSizey());
+		grid = gen.getGrid();
+	}
+
+	/**
+	 * Launches the simulation
+	 */
+	public void launchSimulation() {
+
+	}
+
+	/**
+	 * This method plays a new turn.
+	 */
+	public void simulateNextTurn() {
+
+		for (Mouse m : grid.getMice()) {
+			if (!m.isDead())
+				proceed(m);
+		}
+		killMice();
+		addMice();
+		
+		foodRegenCounter--;
+		//Log.write(foodRegenCounter + " " + Grid.gridParams.getFoodRegenFrequency());
+		if(foodRegenCounter == 0){
+			regenerateFood();
+			foodRegenCounter = grid.getGridParams().getFoodRegenFrequency();
+		}
+		
+		
+		// Regenerate food periodically
+	}
+
+	public void regenerateFood(){
+		Point p;
+		do{
+			p = new Point(Random.randomInt(grid.getGridParams().getSizex()), Random.randomInt(grid.getGridParams().getSizey()));
+		}while(!grid.getSquare(p).isPraticable());
+		grid.getSquare(p).getFoodSource().addFood(5);
+	}
+	
+	
+	public void addMice() {
+		for(Mouse m : miceToAdd)
+			grid.addMouse(m);
+		miceToAdd.clear();
+	}
+	public void killMice() {
+		for (Mouse m : miceToKill) {
+			grid.deleteMouse(m);
+		}
+
+		miceToKill.clear();
+	}
+
+	/**
+	 * Make act a mouse.
+	 * 
+	 * @param m
+	 *            The acting mouse.
+	 */
+	public void proceed(Mouse m) {
+
+		// Log.write("-----");
+
+		lookAround(m);
+		if(m.getLifeTime()>50) {
+			duplicateMouse(m);
+			Log.write(m,"duplicate");
+		}
+		else if(m.getGender()=="Male" && m.getLifeTime() > 15 && grid.isThereFemaleMouseAtPosition(m.getPosition()) && grid.getFemaleMouseAtPosition(m.getPosition()).getLifeTime() > 30 && !grid.getFemaleMouseAtPosition(m.getPosition()).isPregnant()) {
+			mate(m,grid.getFemaleMouseAtPosition(m.getPosition()));
+			Log.write(m,grid.getFemaleMouseAtPosition(m.getPosition()),"breed");
+		}
+		else if (m.getLifeTime() > 50) {
+			moveRandomly(m);
+			Log.write(m,"random");
+		} else if (m.hasTarget()) {
+			
+			if (moveToTarget(m)) {
+				Log.write(m, "target");
+				eat(m, grid.getMouseSquare(m).getFoodSource());
+			} else {
+				Log.write(m,"totarget");
+			}
+		} else if (grid.getMouseSquare(m).containsFood()) {
+			if (m.getLifeTime() < 10 || !condSpe(m)) {
+				Log.write(m,"eat");
+				eat(m, grid.getMouseSquare(m).getFoodSource());
+			} else if (m.knowFoodSource()) {
+				Log.write(m,"newtarget");
+				m.searchNewTarget();
+				calculatePathToTarget(m);
+				/*
+				 * if (moveToTarget(m)) eat(m,
+				 * grid.getMouseSquare(m).getFoodSource());
+				 */
+			} else {
+				Log.write(m,"explore");
+				m.searchUnknown(grid.getGridParams());
+				System.out.print(m.getName() + ":" );calculatePathToTarget(m);
+				/*
+				 * if (moveToTarget(m)) eat(m,
+				 * grid.getMouseSquare(m).getFoodSource());
+				 */
+			}
+		} else if (m.knowFoodSource()) {
+			Log.write(m,"newtarget");
+			m.searchTarget();
+			calculatePathToTarget(m);
+		} else {
+			Log.write(m,"explore");
+			m.searchUnknown(grid.getGridParams());
+			calculatePathToTarget(m);
+		}
+		m.speak(grid.getMiceAroundPosition(m.getPosition()));
+		m.loseLife();
+		if (m.getLifeTime() == 0) {
+			Log.write(m,"death");
+			miceToKill.add(m);
+		}
+		if (m.isPregnant()) {
+			m.decrementPregnancy();
+			if (m.getPregnancyTime() == 0) {
+				birth(m);
+				Log.write(m,"birth");
+			}
+		}
+	}
+
+	public boolean condSpe(Mouse m) {
+		return grid.getMouseSquare(m).getFoodQuantity() < m.getMemory()
+				.getListOfFoodPositionsMemorized().size();
+	}
+
+	public void lookAround(Mouse m) {
+		for (int i = -m.getVision(); i <= m.getVision(); i++) {
+			int vert = Math.abs(Math.abs(i) - m.getVision());
+			for (int j = -vert; j <= vert; j++) {
+				int posX = m.getPosition().getX() + i;
+				int posY = m.getPosition().getY() + j;
+				Point pos = new Point(posX, posY);
+				Square s = grid.getSquare(pos);
+				if (s != null) {
+					m.memorize(s, pos);
+					if(m.getTarget() != null && m.getTarget().equals(pos)){
+
+						if(s.getFoodQuantity() == 0){//On vérifie que c'est un obstacle ou qu'il n'y a pas de nourriture
+							m.setTarget(null);
+						}
+						//Incrementer le taux de bernation
+					}
+				}
+			}
+		}
+	}
+
+	public boolean moveRandomly(Mouse m) {
+		return moveTo(m, Direction.randomDirection());
+	}
+
+	public boolean moveToTarget(Mouse m) {
+		Direction dir = m.popPath();
+		if (m.isOnTarget()) {
+			m.setTarget(null);
+			return true;
+		}
+		if (dir != null) {
+			m.setLastDirection(dir);
+
+			boolean b = moveTo(m, dir);
+			if (!b) {
+
+				calculatePathToTarget(m);
+				moveToTarget(m);
+			}
+		}
+
+		return false;
+	}
+
+	public boolean moveTo(Mouse m, Direction dir) {
+		m.setLastDirection(dir);
+		Point mPos = m.getPosition();
+		Point nextPos;
+		if (dir == Direction.Left)
+			nextPos = new Point(mPos.getX() - 1, mPos.getY());
+		else if (dir == Direction.Right)
+			nextPos = new Point(mPos.getX() + 1, mPos.getY());
+		else if (dir == Direction.Up)
+			nextPos = new Point(mPos.getX(), mPos.getY() - 1);
+		else
+			// if(dir == Direction.Down)
+			nextPos = new Point(mPos.getX(), mPos.getY() + 1);
+
+		if (grid.getSquare(nextPos) != null
+				&& grid.getSquare(nextPos).isPraticable()) {
+			m.setPosition(nextPos);
+			return true;
+		} else
+			return false;
+	}
+
+	public boolean calculatePathToTarget(Mouse m) {
+		ArrayList<Direction> tempPath = pathFinding.calculatePath(
+				m.getPosition(), m.getTarget(), m.getMemory().getGrid());
+
+		if (tempPath != null) {
+			m.setPath(tempPath);
+			return true;
+		} else {
+			return false;
+		}
+	}
+	
+	/**
+	 * Make a mouse feed itself in the specified food source.
+	 * 
+	 * @param m
+	 *            The mouse.
+	 * @param f
+	 *            The food source.
+	 */
+	public void eat(Mouse m, Food f) {
+		if (grid.getMouseSquare(m).containsFood()) {
+			f.consume();
+			m.heal(6);
+		}
+	}
+
+	/**
+	 * This methods creates a clone of this mouse. It is used when the mouse is
+	 * very healthy.
+	 */
+	public void duplicateMouse(Mouse m) {
+		miceToAdd.add(m.copy());
+	}
+
+	/**
+	 * This method is used for the reproduction by a male mouse.
+	 * 
+	 * @param m
+	 *            The female mouse to fertilize.
+	 */
+	public void mate(Mouse m, Mouse f) {
+		if (!m.isSterile())
+			fertilize(f);
+	}
+
+	/**
+	 * This method is used for the reproduction by a female mouse. It
+	 * initializes the pregnancy count.
+	 */
+	public void fertilize(Mouse f) {
+		if (!f.isSterile())
+			f.setPregnancyTime(10);
+	}
+
+	/**
+	 * This method is used to create new mice at the end of the pregnancy time.
+	 */
+	public void birth(Mouse f) {
+		for (int i = 0; i < Random.randomInt(5, true); i++)
+			miceToAdd.add(new Mouse(f.getPosition()));
+	}
+
+	public Grid getGrid() {
+		return grid;
+	}
+
+	public void setGrid(Grid grid) {
+		this.grid = grid;
+	}
+
+	public void fillNamesLists() {
+		// lecture du fichier texte
+		try {
+			InputStream ips = new FileInputStream("micenames.txt");
+			InputStreamReader ipsr = new InputStreamReader(ips);
+			BufferedReader br = new BufferedReader(ipsr);
+			String ligne;
+			boyNames.clear();
+			girlNames.clear();
+			while (!(ligne = br.readLine()).equals("---") && ligne != null) {
+				boyNames.add(ligne);
+			}
+			if (ligne != null) {
+				while ((ligne = br.readLine()) != null) {
+					girlNames.add(ligne);
+				}
+			}
+			br.close();
+		} catch (Exception e) {
+			System.err.println(e.toString());
+		}
+	}
+}

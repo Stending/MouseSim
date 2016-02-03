@@ -1,0 +1,412 @@
+package mouse;
+
+import java.util.ArrayList;
+
+import engine.Simulation;
+
+import utilities.Direction;
+import utilities.PathFinding;
+import utilities.Point;
+import utilities.Random;
+
+import griddata.GridParameters;
+import griddata.Square;
+
+/**
+ * This class represents each mouse present in the grid.
+ * 
+ * @author Zinedine
+ * 
+ */
+public class Mouse {
+
+	private String name;
+	private String gender;
+	private Point position;
+	private int lifeTime;
+	private int pregnancyTime;
+	private Listening listenMode;
+	private Speaking speakMode;
+	private int vision;
+	private boolean sterile;
+	private Memory memory;
+	private ArrayList<Direction> path;
+	private Direction lastDirection;
+	private Point target;
+	private boolean dead;
+	private int deceived;
+
+	/**
+	 * You must specify the position of the mouse when you instantiate it.
+	 * 
+	 * @param p
+	 *            The position of the mouse.
+	 */
+	
+	public Mouse(Point p, String gender){
+		this.gender = gender;
+		name = generateName(gender);
+		position = p;
+		lifeTime = 20;
+		listenMode = new Listening();
+		speakMode = new Speaking();
+		vision = 2;
+		sterile = Random.randomBool(2);
+		target = null;
+		memory = new Memory();
+		dead = false;
+		lastDirection = Direction.Up;
+<<<<<<< .mine
+		deceived = 0;
+=======
+		
+>>>>>>> .r11
+		path = new ArrayList<Direction>();
+	}
+	
+	public Mouse(Point p) {
+		this(p, (Random.randomBool() ? "Male" : "Female"));
+
+		
+	}
+
+	
+
+	public boolean knowFoodSource() {
+		return memory.getListOfFoodPositionsMemorized().size() > 0;
+	}
+
+	public void setGender(String gender) {
+		this.gender = gender;
+	}
+
+	public void setListenMode(Listening listenMode) {
+		this.listenMode = listenMode;
+	}
+
+	public void setSpeakMode(Speaking speakMode) {
+		this.speakMode = speakMode;
+	}
+
+	public void setSterile(boolean sterile) {
+		this.sterile = sterile;
+	}
+
+	public boolean isDead() {
+		return dead;
+	}
+
+	public Mouse copy() {
+		Mouse m = new Mouse(this.position, this.gender);
+		m.setListenMode(this.listenMode);
+		m.setSpeakMode(this.speakMode);
+		m.setSterile(this.sterile);
+		return m;
+	}
+
+	/**
+	 * This method used without parameters increments the mouse life time.
+	 */
+	public void heal() {
+		lifeTime++;
+	}
+
+	/**
+	 * This method used with one parameter adds the specified number to the
+	 * mouse life time.
+	 * 
+	 * @param n
+	 *            The quantity to add.
+	 */
+	public void heal(int n) {
+		lifeTime += n;
+	}
+
+	public void loseLife() {
+		if (lifeTime > 0)
+			lifeTime--;
+	}
+
+	public void loseLife(int n) {
+		lifeTime -= n;
+	}
+
+	/**
+	 * Checks if the mouse already has a target.
+	 * 
+	 * @return "true" if it has a target. Or "false".
+	 */
+	public boolean hasTarget() {
+		return target != null;
+	}
+
+	/**
+	 * Calculates the distance between the mouse and the specified position.
+	 * 
+	 * @param p
+	 *            The position.
+	 * @return A distance.
+	 */
+
+	public double distanceWith(Point p) {
+		return this.position.distanceWith(p);
+	}
+
+	/**
+	 * This method adds a square to the mouse memory.
+	 * 
+	 * @param s
+	 *            The memory square to add.
+	 * @param p
+	 *            The position of the square.
+	 */
+	public void memorize(MemorySquare s, Point p) {
+		memory.addSquare(s, p);
+	}
+
+	public void memorize(Square s, Point p) {
+		memory.addSquare(new MemorySquare(s.containsFood(), s.isPraticable()),
+				p);
+	}
+
+	/**
+	 * This method is used when a mouse speak to another to give informations.
+	 * The information given can be a lie if the mouse's reliability is low.
+	 * 
+	 * @param m
+	 *            The mouse which will listen to this mouse.
+	 */
+	public void speak(ArrayList<Mouse> miceList) {
+		Point p;
+		if (!memory.isEmpty() && !speakMode.isMute()) {
+			if (Random.randomInt(5, true) <= speakMode.getReliability())
+				for(Mouse m : miceList) {
+					if(!m.equals(this)) {
+						System.out.println(this.name+" donne une indication à "+m.getName());
+						p = memory.getFoodPos();
+						if(p != null)
+							m.listen(p);
+					}
+				}
+			else
+				for(Mouse m : miceList) {
+					if(!m.equals(this)) {
+						System.out.println(this.name+" ment à "+m.getName());
+						m.listen(memory.getWrongPos());
+					}
+				}
+		}
+		else
+			System.out.println(this.name+" veut parler mais il est muet...");
+	}
+
+	/**
+	 * This method is used when another mouse speaks to this mouse. The mouse
+	 * can refuse the information if its trust is low.
+	 * 
+	 * @param p
+	 *            The location designated by the other mouse.
+	 */
+	public void listen(Point p) {
+		if (!listenMode.isDeaf()) {
+			if (Random.randomInt(5, true) <= listenMode.getTrust()+this.deceived) {
+				System.out.println(this.name+" le croit et mémorise la case "+p.toString());
+				memorize(new MemorySquare(true, true), p);
+			}
+			else
+				System.out.println("Mais "+this.name+" ne le croit pas.");
+		}
+		else
+			System.out.println("Mais "+this.name+" est sourd");
+	}
+
+	public int getLifeTime() {
+		return lifeTime;
+	}
+
+	public Memory getMemory() {
+		return memory;
+	}
+
+	/**
+	 * The mouse searches a target according to its memory.
+	 */
+	public void searchTarget() {
+		target = getClosestFoodPosition();
+		//calculatePathToTarget();
+	}
+
+	public void searchNewTarget() {
+		target = getClosestFoodPositionExcepted(position);
+		//calculatePathToTarget();
+	}
+
+	public void searchUnknown(GridParameters gp) {
+		target = memory.getUnknownPos(gp.getSizex(), gp.getSizey());
+		//calculatePathToTarget();
+	}
+
+
+	public boolean isOnTarget() {
+		return this.position.equals(target);
+	}
+
+	/**
+	 * Return the closest food source position from the mouse.
+	 * 
+	 * @return A position.
+	 */
+	public Point getClosestFoodPosition() {
+		ArrayList<Point> al = this.memory.getListOfFoodPositionsMemorized();
+		if (!al.isEmpty()) {
+			Point min = al.get(0);
+			for (Point p : al)
+				if (this.distanceWith(p) < this.distanceWith(min))
+					min = p;
+			return min;
+		} else
+			return null;
+	}
+
+	public Point getClosestFoodPositionExcepted(Point po) {
+		ArrayList<Point> al = this.memory.getListOfFoodPositionsMemorized();
+		if (!al.isEmpty()) {
+			Point min = al.get(0);
+			for (Point p : al)
+				if (this.distanceWith(p) < this.distanceWith(min)
+						&& !p.equals(po))
+					min = p;
+			return min;
+		} else
+			return null;
+	}
+
+	/**
+	 * @return the first element of the Path ArrayList and remove it from the
+	 *         ArrayList.
+	 */
+	public Direction popPath() {
+		if (path.size() > 0) {
+			Direction dir = path.get(0);
+			path.remove(0);
+			return dir;
+		} else {
+			return null;
+		}
+	}
+
+	public void setTarget(Point target) {
+		this.target = target;
+	}
+
+	public void setPregnancyTime(int time) {
+		pregnancyTime = time;
+	}
+
+	public String getGender() {
+		return gender;
+	}
+
+	public Point getPosition() {
+		return position;
+	}
+
+	public void setPosition(Point position) {
+		this.position = position;
+	}
+
+	public int getVision() {
+		return vision;
+	}
+
+	public void setVision(int vision) {
+		this.vision = vision;
+	}
+
+	public Direction getLastDirection() {
+		return lastDirection;
+	}
+
+	public void setLastDirection(Direction lastDirection) {
+		this.lastDirection = lastDirection;
+	}
+
+	public int getPregnancyTime() {
+		return pregnancyTime;
+	}
+
+	public boolean isSterile() {
+		return sterile;
+	}
+
+	public boolean isPregnant() {
+		return pregnancyTime > 0;
+	}
+
+	public void decrementPregnancy() {
+		pregnancyTime--;
+	}
+
+	@Override
+	public String toString() {
+		char c;
+		if(this.gender == "Male")
+			c = '♂';
+		else if(this.gender == "Female")
+			c = '♀';
+		else
+			c = '?';
+		return name + " " + c;
+				
+				/*name + " : " + position.toString() + " Life time : " + lifeTime
+				+ " target : " + ((target == null) ? null : target.toString())
+				+ " Cheese known : "
+				+ memory.getListOfFoodPositionsMemorized().size()
+				+ " Memory Size : " + memory.getGrid().size() + "\n";*/
+		/*
+		 * return "Mouse [name=" + name + ", gender=" + gender + ", position=" +
+		 * position + ", lifeTime=" + lifeTime + ", trust=" +
+		 * listenMode.toString() + ", reliability=" + speakMode.toString() +
+		 * ", vision=" + vision + ", sterile=" + sterile + "]";
+		 */
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	/**
+	 * This method returns a name according to the gender specified.
+	 * 
+	 * @param gender
+	 *            The gender of the mouse which name will be returned.
+	 * @return The new mouse name.
+	 */
+	private String generateName(String gender) {
+		ArrayList<String> names = new ArrayList<String>();
+
+		if (gender.equals("Male"))
+			names = Simulation.boyNames;
+		else if (gender.equals("Female"))
+			names = Simulation.girlNames;
+		
+		if(names.isEmpty()){
+			Simulation.otherNamesCounter++;
+			return "Numéro " + Simulation.otherNamesCounter;
+		}else{
+			int rand = Random.randomInt(names.size());
+			String name = names.get(rand);
+			names.remove(rand);
+			return name;
+		}
+	}
+
+	public Point getTarget() {
+		return target;
+	}
+
+	public void setPath(ArrayList<Direction> path) {
+		this.path = path;		
+	}
+
+}
